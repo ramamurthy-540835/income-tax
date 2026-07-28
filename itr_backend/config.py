@@ -8,6 +8,7 @@ from dataclasses import dataclass
 class Settings:
     gcp_project_id: str
     gcs_bucket_name: str
+    bigquery_dataset: str = "income_tax_ops"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -23,4 +24,8 @@ class Settings:
         ]
         if missing:
             raise RuntimeError("Missing backend configuration: " + ", ".join(missing))
-        return cls(gcp_project_id=project_id, gcs_bucket_name=bucket_name)
+        return cls(
+            gcp_project_id=project_id,
+            gcs_bucket_name=bucket_name,
+            bigquery_dataset=os.getenv("BIGQUERY_DATASET", "income_tax_ops"),
+        )

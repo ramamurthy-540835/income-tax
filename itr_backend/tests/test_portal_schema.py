@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import hashlib
 import unittest
 
 from itr_backend.tax_years import get_tax_year
 
 
 class OfficialPortalSchemaTests(unittest.TestCase):
+    def test_pinned_schema_checksum_matches_repository_artifact(self):
+        policy = get_tax_year("AY_2026-27")
+
+        actual = hashlib.sha256(policy.schema_path.read_bytes()).hexdigest()
+
+        self.assertEqual(actual, policy.descriptor.schema_sha256)
+
     def test_official_v11_schema_loads_with_bom_and_rejects_empty_payload(self):
         policy = get_tax_year("AY_2026-27")
 

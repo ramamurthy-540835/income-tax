@@ -7,6 +7,7 @@ from typing import Any
 
 from itr_backend.filing_models import (
     CalculationResult,
+    DonationPlanning,
     FilingProfile,
     NormalizedReturnData,
     TaxYearDescriptor,
@@ -61,7 +62,7 @@ class AY202627Policy(TaxYearPolicy):
         form="ITR-1",
         policy_version="1.0.0",
         schema_version="1.1",
-        schema_sha256="d229b3b814b9d495397bbcb9d7268981834dcdf580ef39cda02f7fbc1b3da3ab",
+        schema_sha256="8b2efa0ad19f1dbd03883d61ce3b63c9e64e72f66169dc5026b5dad7bbb7969d",
         enabled=True,
         official_schema_release_date=date(2026, 6, 30),
         official_validation_release_date=date(2026, 5, 15),
@@ -337,6 +338,74 @@ class AY202627Policy(TaxYearPolicy):
         cess = tax_after_rebate * _money("0.04")
         total_tax = _round_288b(tax_after_rebate + cess)
         taxes_paid = _round_rupee(data.tax_paid.total)
+        donation_planning = None
+        if regime == "old":
+            non_80g_deductions = max(total_deductions - deductions.section_80g, 0)
+            adjusted_total_income = max(
+                normal_gti - non_80g_deductions,
+                0,
+            )
+            qualifying_ceiling = adjusted_total_income * _money("0.10")
+
+            def tax_with_additional_80g(additional_deduction: Decimal) -> int:
+                scenario_normal_income = max(
+                    normal_total_income - additional_deduction,
+                    0,
+                )
+                scenario_normal_tax = _slab_tax(scenario_normal_income, slabs)
+                scenario_total_income = scenario_normal_income + ltcg_112a
+                scenario_rebate = (
+                    min(scenario_normal_tax, _money(12500))
+                    if scenario_total_income <= _money(500000)
+                    else _money(0)
+                )
+                scenario_after_rebate = (
+                    max(scenario_normal_tax - scenario_rebate, 0) + special_tax
+                )
+                return _round_288b(
+                    scenario_after_rebate
+                    + scenario_after_rebate * _money("0.04")
+                )
+
+            full_deduction = min(qualifying_ceiling, normal_total_income)
+            half_deduction = min(
+                qualifying_ceiling * _money("0.50"),
+                normal_total_income,
+            )
+            donation_planning = DonationPlanning(
+                regime_eligible=True,
+                adjusted_total_income=_round_rupee(adjusted_total_income),
+                limited_category_qualifying_ceiling=_round_rupee(
+                    qualifying_ceiling
+                ),
+                max_donation_100_percent_limited=_round_rupee(
+                    qualifying_ceiling
+                ),
+                max_deduction_100_percent_limited=_round_rupee(
+                    qualifying_ceiling
+                ),
+                estimated_tax_saving_100_percent_limited=max(
+                    total_tax - tax_with_additional_80g(full_deduction),
+                    0,
+                ),
+                max_donation_50_percent_limited=_round_rupee(
+                    qualifying_ceiling
+                ),
+                max_deduction_50_percent_limited=_round_rupee(
+                    qualifying_ceiling * _money("0.50")
+                ),
+                estimated_tax_saving_50_percent_limited=max(
+                    total_tax - tax_with_additional_80g(half_deduction),
+                    0,
+                ),
+                notes=[
+                    "The donee's notified 80G category determines whether the "
+                    "deduction is 100% or 50% and whether this ceiling applies.",
+                    "A receipt and Form 10BE must be issued by the eligible donee; "
+                    "the application only records and validates that evidence.",
+                    "Cash donations above Rs 2,000 are not deductible.",
+                ],
+            )
 
         issues.extend(self.validate_eligibility(FilingProfile(), data))
         issues = [issue for issue in issues if issue.code != "ELIGIBILITY_UNCONFIRMED"]
@@ -363,5 +432,6 @@ class AY202627Policy(TaxYearPolicy):
             taxes_paid=taxes_paid,
             balance_payable=max(total_tax - taxes_paid, 0),
             refund=max(taxes_paid - total_tax, 0),
+            donation_planning=donation_planning,
             issues=issues,
         )

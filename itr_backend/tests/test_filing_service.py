@@ -13,6 +13,7 @@ from pypdf import PdfWriter
 from itr_backend.filing_models import (
     BankAccount,
     EligibilityAnswers,
+    ExtractedTaxFacts,
     FilingProfile,
     IncomeDetails,
     NormalizedReturnData,
@@ -214,6 +215,78 @@ class FilingServiceTests(unittest.TestCase):
             self.artifacts.values,
         )
 
+    def test_old_regime_pdf_is_generated_and_stored_under_client_id(self):
+        self.create_profile_and_return()
+
+        payload, filename = self.service.generate_calculation_pdf(
+            AY, CUSTOMER_ID, "old", "reviewer-1"
+        )
+
+        self.assertTrue(payload.startswith(b"%PDF-"))
+        self.assertIn("OLD_Regime", filename)
+        report_objects = [
+            name for name in self.artifacts.values if "/07_reports/" in name
+        ]
+        self.assertEqual(len(report_objects), 1)
+        self.assertIn(CUSTOMER_ID, report_objects[0])
+
+    def test_documents_are_reconciled_into_tax_and_maximum_donation(self):
+        class FakeExtractor:
+            def __init__(self):
+                self.calls = 0
+
+            def extract(self, document_id, payload, mime_type):
+                self.calls += 1
+                if self.calls == 1:
+                    return ExtractedTaxFacts(
+                        document_id=document_id,
+                        document_type="Form 16",
+                        issuer="Employer",
+                        assessment_year="2026-27",
+                        gross_salary=2_000_000,
+                        professional_tax=2_500,
+                        tds_salary=250_000,
+                        section_80c=150_000,
+                        evidence_quality="high",
+                    )
+                return ExtractedTaxFacts(
+                    document_id=document_id,
+                    document_type="Annual Information Statement",
+                    issuer="Income Tax Department",
+                    assessment_year="2026-27",
+                    gross_salary=2_000_000,
+                    savings_interest=15_000,
+                    deposit_interest=40_000,
+                    tds_salary=250_000,
+                    evidence_quality="high",
+                )
+
+        self.service = FilingService(
+            self.metadata, self.artifacts, tax_extractor=FakeExtractor()
+        )
+        self.service.put_profile(AY, CUSTOMER_ID, complete_profile(), None)
+        writer = PdfWriter()
+        writer.add_blank_page(width=100, height=100)
+        output = io.BytesIO()
+        writer.write(output)
+        for name in ("Form 16 AY 2026-27.pdf", "AIS AY 2026-27.pdf"):
+            self.service.auto_upload_document(
+                AY, CUSTOMER_ID, name, output.getvalue(), "application/pdf", "user"
+            )
+
+        result = self.service.extract_and_calculate(
+            AY, CUSTOMER_ID, compare_new=True, actor="reviewer"
+        )
+
+        self.assertEqual(result.reconciled.gross_salary, 2_000_000)
+        self.assertEqual(result.reconciled.deposit_interest, 40_000)
+        self.assertGreater(result.maximum_useful_donation_50_percent_limited, 0)
+        self.assertLessEqual(
+            result.old_after_donation.total_tax,
+            result.old_before_donation.total_tax,
+        )
+        self.assertIsNotNone(result.new_regime)
+
     def test_valid_pdf_is_hashed_and_indexed(self):
         writer = PdfWriter()
         writer.add_blank_page(width=100, height=100)
@@ -232,6 +305,50 @@ class FilingServiceTests(unittest.TestCase):
         self.assertEqual(document.page_count, 1)
         self.assertEqual(len(document.sha256), 64)
         self.assertEqual(len(self.service.list_documents(AY, CUSTOMER_ID)), 1)
+
+    def test_encrypted_ais_uses_profile_pan_and_dob_without_env_password(self):
+        self.service.put_profile(AY, CUSTOMER_ID, complete_profile(), None)
+        writer = PdfWriter()
+        writer.add_blank_page(width=100, height=100)
+        writer.encrypt("abcde1234f01011990")
+        output = io.BytesIO()
+        writer.write(output)
+
+        document = self.service.upload_document(
+            AY,
+            CUSTOMER_ID,
+            "ais",
+            "AIS.pdf",
+            output.getvalue(),
+            "user-1",
+        )
+
+        self.assertEqual(document.page_count, 1)
+        self.assertIsNotNone(document.processing_object_name)
+        self.assertIn(document.processing_object_name, self.artifacts.values)
+
+    def test_auto_intake_classifies_renames_and_preserves_original(self):
+        self.service.put_profile(AY, CUSTOMER_ID, complete_profile(), None)
+        writer = PdfWriter()
+        writer.add_blank_page(width=100, height=100)
+        output = io.BytesIO()
+        writer.write(output)
+
+        document = self.service.auto_upload_document(
+            AY,
+            CUSTOMER_ID,
+            "Form 16 AY 2026-27.pdf",
+            output.getvalue(),
+            "application/pdf",
+            "user-1",
+        )
+
+        self.assertEqual(document.category, "form16")
+        self.assertIn("Form_16", document.renamed_filename)
+        self.assertIn("/01_source/originals/", document.object_name)
+        self.assertIn("/02_extracted/renamed/", document.processing_object_name)
+        self.assertIn(document.object_name, self.artifacts.values)
+        self.assertIn(document.processing_object_name, self.artifacts.values)
 
     def test_review_and_export_require_all_gates(self):
         self.create_profile_and_return()

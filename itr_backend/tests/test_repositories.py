@@ -64,7 +64,12 @@ class GCSWorkspaceRepositoryTests(unittest.TestCase):
 
         repository.initialize(customer)
 
-        self.assertEqual(len(bucket.blobs), 5)
+        self.assertEqual(len(bucket.blobs), 9)
+        prefix = customer.workspace_prefix
+        self.assertIn(prefix + "01_source/originals/manifest.json", bucket.blobs)
+        self.assertIn(prefix + "02_extracted/renamed/manifest.json", bucket.blobs)
+        self.assertIn(prefix + "06_notices/manifest.json", bucket.blobs)
+        self.assertIn(prefix + "07_reports/manifest.json", bucket.blobs)
         self.assertTrue(
             all("Sensitive" not in object_name for object_name in bucket.blobs)
         )

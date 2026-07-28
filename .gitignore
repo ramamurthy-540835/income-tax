@@ -3,3 +3,9 @@
 __pycache__/
 .pytest_cache/
 rename_audit_*.csv
+.gcloud/
+.tools/
+work/
+web/node_modules/
+web/.next/
+web/.env.local

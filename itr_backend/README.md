@@ -20,6 +20,33 @@ workspace and versioned GCS artifact prefix.
 11. Record acknowledgement and verification evidence after manual filing.
 12. Append actor-attributed workflow events to the AY/customer Firestore audit
     collection without copying taxpayer or return payloads into audit metadata.
+13. Accept encrypted AIS PDFs by deriving the standard password from the saved
+    client profile (`lowercase PAN + DOB as DDMMYYYY`). The password is never
+    stored and no client-specific `.env` file is used.
+14. Create evidence-linked notice/demand cases, generate conservative response
+    drafts, and require independent professional review before submission.
+15. Save searchable client/document/notice/response/calculation/report metadata
+    in BigQuery while keeping raw documents and response bodies in private GCS.
+16. Generate separate old/new regime PDF workpapers under each client's
+    `07_reports/` prefix; old-regime reports include 80G planning.
+17. Extract tax facts directly from uploaded Form 16, AIS, Form 26AS and
+    deduction evidence using one backend-level Gemini configuration, reconcile
+    duplicate sources, and compute old-regime tax before/after the maximum
+    useful 50%-limited 80G donation.
+
+## Notice and demand workflow
+
+Notice cases support outstanding demands and common proceedings including
+sections 139(9), 142(1), 143(1)(a), 143(2), 144, 148/148A, 154, 245, 263,
+270A, and 277A. Drafts are stored below `06_notices/` in the customer's AY
+workspace. They include the portal route, annexure index, missing-information
+checks, and risk flags.
+
+The system deliberately does not submit responses to the portal. High-risk
+proceedings are flagged, and a section 277A case produces only a protective
+preliminary response pending review by a qualified tax professional/advocate.
+Official portal responses cannot be edited or withdrawn after submission, so
+the backend keeps `submission_ready=false` until the reviewer gate passes.
 
 Portal login, passwords, OTPs, return submission, and e-verification are not
 automated. Direct vendor JSON generation also requires the department-issued
@@ -87,6 +114,69 @@ when updating it. Stale writes return HTTP 409.
 OpenAPI is available at `/api/docs`. Core resources include customers,
 enrollment, profile, return data, calculations, documents, portal draft,
 schema validation, review, export, filing evidence, and workspace summary.
+
+Notice endpoints:
+
+```text
+POST /api/assessment-years/{ay}/customers/{id}/notices
+GET  /api/assessment-years/{ay}/customers/{id}/notices
+POST /api/assessment-years/{ay}/customers/{id}/notices/{case_id}/draft
+POST /api/assessment-years/{ay}/customers/{id}/notices/{case_id}/review
+```
+
+## Automatic evidence intake
+
+The frontend sends up to 50 PDF/JPG/PNG files to the batch endpoint without
+requiring the user to select document types:
+
+```text
+POST /api/assessment-years/{ay}/customers/{id}/documents/batch
+```
+
+For every accepted file the backend:
+
+1. validates the file signature, size, page count, and active-content markers;
+2. unlocks an encrypted AIS from the saved PAN and DOB where applicable;
+3. classifies common tax documents and notices;
+4. retains the exact immutable upload under `01_source/originals/`;
+5. creates a contextual client-prefixed copy under
+   `02_extracted/renamed/`;
+6. records SHA-256, confidence, category, filenames, generations, and actor.
+
+Low-confidence documents remain in the client workspace with
+`review_required` status instead of being assigned an invented category.
+
+Pasted notice text can be analyzed before case creation:
+
+```text
+POST /api/assessment-years/{ay}/customers/{id}/notices/analyze
+```
+
+The result includes detected section/DIN/deadline/demand, urgency, portal
+route, recommended course, evidence checklist, unresolved questions, and
+professional-review risk flags.
+
+## Automatic tax calculation from documents
+
+```text
+POST /api/assessment-years/{ay}/customers/{id}/automation/calculate
+POST /api/assessment-years/{ay}/customers/{id}/automation/calculate?compare_new=true
+```
+
+The pipeline reads the renamed processing copies from GCS, extracts annual tax
+facts, excludes other financial years, uses source priority to avoid adding AIS
+and Form 16 salary twice, persists normalized return data, and returns:
+
+- old-regime tax and balance before donation;
+- maximum useful donation for the 50%-deduction limited 80G category;
+- eligible 80G deduction;
+- old-regime tax and final balance after donation;
+- tax reduction achieved;
+- optional new-regime comparison;
+- source documents and reconciliation warnings.
+
+Configure `GEMINI_API_KEY` once for the backend runtime. Client-specific API
+keys or password `.env` files are not read.
 
 ## Tests
 

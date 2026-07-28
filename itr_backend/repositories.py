@@ -25,6 +25,10 @@ class CustomerRepository(Protocol):
 
     def list(self, assessment_year: str) -> list[CustomerRecord]: ...
 
+    def set_active(
+        self, assessment_year: str, customer_id: str, is_active: bool
+    ) -> None: ...
+
 
 class WorkspaceRepository(Protocol):
     def initialize(self, customer: CustomerRecord) -> None: ...
@@ -55,6 +59,7 @@ class FirestoreCustomerRepository:
             "display_name": customer.display_name,
             "created_at": customer.created_at,
             "updated_at": customer.updated_at,
+            "is_active": customer.is_active,
         }
         workspace_data = customer.model_dump(mode="python")
         batch = self._client.batch()
@@ -99,6 +104,20 @@ class FirestoreCustomerRepository:
             for snapshot in query.stream()
         ]
 
+    def set_active(
+        self, assessment_year: str, customer_id: str, is_active: bool
+    ) -> None:
+        batch = self._client.batch()
+        batch.update(
+            self._workspace_ref(assessment_year, customer_id),
+            {"is_active": is_active, "updated_at": firestore.SERVER_TIMESTAMP},
+        )
+        batch.update(
+            self._global_ref(customer_id),
+            {"is_active": is_active, "updated_at": firestore.SERVER_TIMESTAMP},
+        )
+        batch.commit()
+
 
 class GCSWorkspaceRepository:
     def __init__(self, bucket: storage.Bucket):
@@ -125,6 +144,7 @@ class GCSWorkspaceRepository:
                 "client_id": customer.customer_id,
                 "assessment_year": customer.assessment_year.removeprefix("AY_"),
                 "preferred_regime": customer.preferred_regime,
+                "is_active": customer.is_active,
                 "password_env_vars": [],
                 "preparer_review_required": True,
                 "portal_submission_mode": "manual_after_validation",
@@ -157,6 +177,21 @@ class GCSWorkspaceRepository:
             f"{prefix}03_workpapers/filing_readiness.json",
             {"upload_ready": False, "blockers": ["Customer setup is incomplete."]},
         )
+        for folder in (
+            "01_source/originals",
+            "02_extracted/renamed",
+            "06_notices",
+            "07_reports",
+        ):
+            self._write_json(
+                f"{prefix}{folder}/manifest.json",
+                {
+                    "customer_id": customer.customer_id,
+                    "assessment_year": customer.assessment_year,
+                    "folder": folder,
+                    "created_at": customer.created_at.isoformat(),
+                },
+            )
 
     def delete(self, workspace_prefix: str) -> None:
         for blob in self._bucket.list_blobs(prefix=workspace_prefix):

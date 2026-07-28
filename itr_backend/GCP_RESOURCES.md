@@ -25,6 +25,40 @@ Service-account roles:
 
 - `roles/datastore.user` on project `aidirac-503309`
 - `roles/storage.objectAdmin` on the income-tax bucket only
+- `roles/bigquery.dataEditor` on project `aidirac-503309`
+- `roles/bigquery.jobUser` on project `aidirac-503309`
+
+BigQuery operational index (provisioned 2026-07-28):
+
+```text
+Dataset: aidirac-503309.income_tax_ops
+Location: asia-south1
+
+Tables:
+  clients
+  documents
+  notices
+  responses
+  calculations
+  reports
+```
+
+BigQuery stores searchable workflow metadata and GCS object pointers. Raw
+taxpayer PDFs and full response payloads remain in the private, versioned GCS
+workspace under:
+
+```text
+assessment-years/{AY}/customers/{customer_id}/
+```
+
+Every newly onboarded client receives manifests for:
+
+```text
+01_source/originals/
+02_extracted/renamed/
+06_notices/
+07_reports/
+```
 
 No service-account key file was created. Cloud Run should use the attached
 service account when deployment is added.

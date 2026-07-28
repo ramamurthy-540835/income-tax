@@ -16,6 +16,8 @@ DocumentCategory = Literal[
     "deduction_80g",
     "house_property",
     "capital_gains",
+    "notice",
+    "demand",
     "identity",
     "other",
 ]
@@ -36,7 +38,11 @@ class DocumentRecord(BaseModel):
     assessment_year: str
     category: DocumentCategory
     original_filename: str
+    renamed_filename: str | None = None
+    detected_document_type: str | None = None
+    classification_confidence: float | None = Field(default=None, ge=0, le=1)
     object_name: str
+    processing_object_name: str | None = None
     generation: int
     sha256: str
     size_bytes: int
@@ -50,6 +56,11 @@ class DocumentRecord(BaseModel):
 
 class DocumentList(BaseModel):
     documents: list[DocumentRecord]
+
+
+class BatchDocumentUploadResult(BaseModel):
+    documents: list[DocumentRecord]
+    failed: list[dict[str, str]] = Field(default_factory=list)
 
 
 class FilingState(BaseModel):

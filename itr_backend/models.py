@@ -25,6 +25,7 @@ class CustomerCreate(BaseModel):
 
     display_name: str = Field(min_length=1, max_length=160)
     preferred_regime: Literal["old", "new", "compare"] = "compare"
+    is_active: bool = True
 
     @field_validator("display_name")
     @classmethod
@@ -41,6 +42,7 @@ class CustomerRecord(BaseModel):
     assessment_year: str
     display_name: str
     preferred_regime: Literal["old", "new", "compare"]
+    is_active: bool = True
     status: Literal["provisioning", "active", "provisioning_failed"]
     workspace_prefix: str
     created_at: datetime
@@ -54,3 +56,7 @@ class CustomerList(BaseModel):
 
 class HealthResponse(BaseModel):
     status: Literal["ok"]
+
+
+class CustomerStatusUpdate(BaseModel):
+    is_active: bool

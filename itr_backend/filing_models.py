@@ -72,6 +72,13 @@ class FilingProfile(BaseModel):
     eligibility: EligibilityAnswers = Field(default_factory=EligibilityAnswers)
 
 
+class ClientOnboardingRequest(BaseModel):
+    display_name: str = Field(min_length=1, max_length=160)
+    preferred_regime: Literal["old", "new", "compare"] = "compare"
+    is_active: bool = True
+    profile: FilingProfile
+
+
 class HousePropertyIncome(BaseModel):
     property_type: Literal["self_occupied", "let_out", "deemed_let_out"]
     net_income_or_loss: Decimal = Decimal("0")
@@ -165,6 +172,19 @@ class ValidationIssue(BaseModel):
     message: str
 
 
+class DonationPlanning(BaseModel):
+    regime_eligible: bool
+    adjusted_total_income: int
+    limited_category_qualifying_ceiling: int
+    max_donation_100_percent_limited: int
+    max_deduction_100_percent_limited: int
+    estimated_tax_saving_100_percent_limited: int
+    max_donation_50_percent_limited: int
+    max_deduction_50_percent_limited: int
+    estimated_tax_saving_50_percent_limited: int
+    notes: list[str] = Field(default_factory=list)
+
+
 class CalculationResult(BaseModel):
     assessment_year: str
     regime: Regime
@@ -179,8 +199,59 @@ class CalculationResult(BaseModel):
     taxes_paid: int
     balance_payable: int
     refund: int
+    donation_planning: DonationPlanning | None = None
     advisory_only: bool = True
     issues: list[ValidationIssue] = Field(default_factory=list)
+
+
+class ExtractedTaxFacts(BaseModel):
+    document_id: str
+    document_type: str
+    issuer: str | None = None
+    financial_year: str | None = None
+    assessment_year: str | None = None
+    taxpayer_name: str | None = None
+    gross_salary: Decimal = Field(default=Decimal("0"), ge=0)
+    exempt_salary_allowances: Decimal = Field(default=Decimal("0"), ge=0)
+    professional_tax: Decimal = Field(default=Decimal("0"), ge=0)
+    savings_interest: Decimal = Field(default=Decimal("0"), ge=0)
+    deposit_interest: Decimal = Field(default=Decimal("0"), ge=0)
+    dividend_income: Decimal = Field(default=Decimal("0"), ge=0)
+    tds_salary: Decimal = Field(default=Decimal("0"), ge=0)
+    tds_other: Decimal = Field(default=Decimal("0"), ge=0)
+    section_80c: Decimal = Field(default=Decimal("0"), ge=0)
+    section_80d: Decimal = Field(default=Decimal("0"), ge=0)
+    section_80tta: Decimal = Field(default=Decimal("0"), ge=0)
+    evidence_quality: Literal["high", "medium", "low"] = "low"
+    notes: list[str] = Field(default_factory=list)
+
+
+class ReconciledTaxFacts(BaseModel):
+    gross_salary: int
+    exempt_salary_allowances: int
+    professional_tax: int
+    savings_interest: int
+    deposit_interest: int
+    dividend_income: int
+    tds_salary: int
+    tds_other: int
+    section_80c: int
+    section_80d: int
+    section_80tta: int
+    source_document_ids: list[str]
+    warnings: list[str] = Field(default_factory=list)
+
+
+class AutomatedTaxCalculation(BaseModel):
+    reconciled: ReconciledTaxFacts
+    old_before_donation: CalculationResult
+    maximum_useful_donation_50_percent_limited: int
+    eligible_80g_deduction: int
+    old_after_donation: CalculationResult
+    tax_reduction_from_donation: int
+    new_regime: CalculationResult | None = None
+    extracted_documents: list[ExtractedTaxFacts]
+    review_required: bool = True
 
 
 class TaxYearDescriptor(BaseModel):

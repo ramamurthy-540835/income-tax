@@ -17,8 +17,10 @@ from fastapi import (
     status,
 )
 from fastapi.responses import Response as RawResponse
-from google.cloud import firestore, storage
+from fastapi.middleware.cors import CORSMiddleware
+from google.cloud import bigquery, firestore, storage
 
+from itr_backend.analytics import BigQueryAnalyticsRepository
 from itr_backend.audit import FirestoreAuditRepository
 from itr_backend.auth import (
     Authenticator,
@@ -34,7 +36,9 @@ from itr_backend.enrollment import (
     FirestoreAssessmentYearEnrollmentRepository,
 )
 from itr_backend.filing_models import (
+    AutomatedTaxCalculation,
     CalculationResult,
+    ClientOnboardingRequest,
     FilingEvidence,
     FilingProfile,
     NormalizedReturnData,
@@ -58,9 +62,20 @@ from itr_backend.models import (
     CustomerCreate,
     CustomerList,
     CustomerRecord,
+    CustomerStatusUpdate,
     HealthResponse,
     normalize_assessment_year,
 )
+from itr_backend.notice_models import (
+    NoticeCase,
+    NoticeCaseCreate,
+    NoticeCaseList,
+    NoticeAnalysis,
+    NoticeAnalysisRequest,
+    NoticeReview,
+    ResponseDraft,
+)
+from itr_backend.notice_service import NoticeService
 from itr_backend.read_routes import register_read_routes
 from itr_backend.repositories import (
     FirestoreCustomerRepository,
@@ -73,6 +88,7 @@ from itr_backend.service import (
 )
 from itr_backend.storage_models import (
     ArtifactWriteResult,
+    BatchDocumentUploadResult,
     DocumentCategory,
     DocumentList,
     DocumentRecord,
@@ -87,6 +103,7 @@ class BackendRuntime:
     filing_service: FilingService
     enrollment_service: AssessmentYearEnrollmentService
     authenticator: Authenticator
+    notice_service: NoticeService
 
 
 @lru_cache
@@ -94,6 +111,10 @@ def build_runtime() -> BackendRuntime:
     settings = Settings.from_env()
     firestore_client = firestore.Client(project=settings.gcp_project_id)
     storage_client = storage.Client(project=settings.gcp_project_id)
+    analytics = BigQueryAnalyticsRepository(
+        bigquery.Client(project=settings.gcp_project_id),
+        settings.bigquery_dataset,
+    )
     bucket = storage_client.bucket(settings.gcs_bucket_name)
     customer_repository = FirestoreCustomerRepository(firestore_client)
     workspace_repository = GCSWorkspaceRepository(bucket)
@@ -103,11 +124,13 @@ def build_runtime() -> BackendRuntime:
         customer_service=CustomerService(
             customers=customer_repository,
             workspaces=workspace_repository,
+            analytics=analytics,
         ),
         filing_service=FilingService(
             metadata=filing_metadata,
             artifacts=artifacts,
             audit=FirestoreAuditRepository(firestore_client),
+            analytics=analytics,
         ),
         enrollment_service=AssessmentYearEnrollmentService(
             enrollment=FirestoreAssessmentYearEnrollmentRepository(firestore_client),
@@ -116,6 +139,12 @@ def build_runtime() -> BackendRuntime:
             artifacts=artifacts,
         ),
         authenticator=build_authenticator(firestore_client),
+        notice_service=NoticeService(
+            artifacts=artifacts,
+            audit=FirestoreAuditRepository(firestore_client),
+            metadata=filing_metadata,
+            analytics=analytics,
+        ),
     )
 
 
@@ -145,12 +174,24 @@ def create_app(
     filing_service: FilingService | None = None,
     enrollment_service: AssessmentYearEnrollmentService | None = None,
     authenticator: Authenticator | None = None,
+    notice_service: NoticeService | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title="AIDIRAC Income Tax API",
         version="0.2.0",
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "If-Match"],
+        expose_headers=["ETag"],
     )
     app.state.customer_service = customer_service
     app.state.filing_service = filing_service
@@ -165,6 +206,7 @@ def create_app(
             )
         )
     app.state.authenticator = authenticator
+    app.state.notice_service = notice_service
 
     def current_user(request: Request) -> UserContext:
         configured = request.app.state.authenticator or build_runtime().authenticator
@@ -182,6 +224,9 @@ def create_app(
         return (
             request.app.state.enrollment_service or build_runtime().enrollment_service
         )
+
+    def notice_api(request: Request) -> NoticeService:
+        return request.app.state.notice_service or build_runtime().notice_service
 
     @app.exception_handler(ConcurrentUpdateError)
     def concurrent_update_handler(request: Request, exc: ConcurrentUpdateError):
@@ -276,6 +321,59 @@ def create_app(
             return service.get(assessment_year, customer_id)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except CustomerNotFoundError as exc:
+            raise HTTPException(status_code=404, detail="Customer not found") from exc
+
+    @app.post(
+        "/api/assessment-years/{assessment_year}/clients/onboard",
+        response_model=CustomerRecord,
+        status_code=201,
+    )
+    def onboard_client(
+        assessment_year: str,
+        payload: ClientOnboardingRequest,
+        customers: CustomerService = Depends(customer_api),
+        filings: FilingService = Depends(filing_api),
+        user: UserContext = Depends(current_user),
+    ) -> CustomerRecord:
+        user.require_any_role("admin", "preparer")
+        customer = customers.create(
+            assessment_year,
+            CustomerCreate(
+                display_name=payload.display_name,
+                preferred_regime=payload.preferred_regime,
+                is_active=payload.is_active,
+            ),
+        )
+        _, generation = filings.get_profile(
+            customer.assessment_year, customer.customer_id
+        )
+        filings.put_profile(
+            customer.assessment_year,
+            customer.customer_id,
+            payload.profile,
+            generation,
+            user.subject,
+        )
+        return customer
+
+    @app.patch(
+        "/api/assessment-years/{assessment_year}/customers/{customer_id}/status",
+        response_model=CustomerRecord,
+    )
+    def update_customer_status(
+        assessment_year: str,
+        customer_id: str,
+        payload: CustomerStatusUpdate,
+        service: CustomerService = Depends(customer_api),
+        user: UserContext = Depends(current_user),
+    ) -> CustomerRecord:
+        user.require_any_role("admin", "preparer")
+        user.require_customer_access(customer_id)
+        try:
+            return service.set_active(
+                assessment_year, customer_id, payload.is_active
+            )
         except CustomerNotFoundError as exc:
             raise HTTPException(status_code=404, detail="Customer not found") from exc
 
@@ -394,6 +492,50 @@ def create_app(
         return service.calculate(assessment_year, customer_id, regime, user.subject)
 
     @app.post(
+        "/api/assessment-years/{assessment_year}/customers/{customer_id}/calculations/{regime}/pdf",
+    )
+    def calculate_pdf(
+        assessment_year: str,
+        customer_id: str,
+        regime: Literal["old", "new"],
+        service: FilingService = Depends(filing_api),
+        user: UserContext = Depends(current_user),
+    ):
+        user.require_any_role("admin", "preparer", "reviewer")
+        user.require_customer_access(customer_id)
+        payload, filename = service.generate_calculation_pdf(
+            assessment_year, customer_id, regime, user.subject
+        )
+        return RawResponse(
+            content=payload,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Cache-Control": "no-store",
+            },
+        )
+
+    @app.post(
+        "/api/assessment-years/{assessment_year}/customers/{customer_id}/automation/calculate",
+        response_model=AutomatedTaxCalculation,
+    )
+    def automate_tax_from_documents(
+        assessment_year: str,
+        customer_id: str,
+        compare_new: bool = False,
+        service: FilingService = Depends(filing_api),
+        user: UserContext = Depends(current_user),
+    ) -> AutomatedTaxCalculation:
+        user.require_any_role("admin", "preparer", "reviewer")
+        user.require_customer_access(customer_id)
+        return service.extract_and_calculate(
+            assessment_year,
+            customer_id,
+            compare_new,
+            user.subject,
+        )
+
+    @app.post(
         "/api/assessment-years/{assessment_year}/customers/{customer_id}/documents",
         response_model=DocumentRecord,
         status_code=201,
@@ -432,6 +574,43 @@ def create_app(
         return DocumentList(
             documents=service.list_documents(assessment_year, customer_id)
         )
+
+    @app.post(
+        "/api/assessment-years/{assessment_year}/customers/{customer_id}/documents/batch",
+        response_model=BatchDocumentUploadResult,
+        status_code=201,
+    )
+    async def batch_upload_documents(
+        assessment_year: str,
+        customer_id: str,
+        files: Annotated[list[UploadFile], File()],
+        service: FilingService = Depends(filing_api),
+        user: UserContext = Depends(current_user),
+    ) -> BatchDocumentUploadResult:
+        user.require_any_role("admin", "preparer", "customer")
+        user.require_customer_access(customer_id)
+        if not files or len(files) > 50:
+            raise HTTPException(
+                status_code=422, detail="upload between 1 and 50 documents per batch"
+            )
+        accepted: list[DocumentRecord] = []
+        failed: list[dict[str, str]] = []
+        for file in files:
+            filename = file.filename or "document"
+            try:
+                accepted.append(
+                    service.auto_upload_document(
+                        assessment_year,
+                        customer_id,
+                        filename,
+                        await file.read(),
+                        file.content_type or "application/octet-stream",
+                        user.subject,
+                    )
+                )
+            except FilingValidationError as exc:
+                failed.append({"filename": filename, "reason": str(exc)})
+        return BatchDocumentUploadResult(documents=accepted, failed=failed)
 
     @app.put(
         "/api/assessment-years/{assessment_year}/customers/{customer_id}/portal-draft",
@@ -535,6 +714,87 @@ def create_app(
     ) -> WorkspaceSummary:
         user.require_customer_access(customer_id)
         return service.summary(assessment_year, customer_id)
+
+    @app.post(
+        "/api/assessment-years/{assessment_year}/customers/{customer_id}/notices",
+        response_model=NoticeCase,
+        status_code=201,
+    )
+    def create_notice_case(
+        assessment_year: str,
+        customer_id: str,
+        payload: NoticeCaseCreate,
+        service: NoticeService = Depends(notice_api),
+        user: UserContext = Depends(current_user),
+    ) -> NoticeCase:
+        user.require_any_role("admin", "preparer")
+        user.require_customer_access(customer_id)
+        return service.create(assessment_year, customer_id, payload, user.subject)
+
+    @app.post(
+        "/api/assessment-years/{assessment_year}/customers/{customer_id}/notices/analyze",
+        response_model=NoticeAnalysis,
+    )
+    def analyze_pasted_notice(
+        assessment_year: str,
+        customer_id: str,
+        payload: NoticeAnalysisRequest,
+        service: NoticeService = Depends(notice_api),
+        user: UserContext = Depends(current_user),
+    ) -> NoticeAnalysis:
+        user.require_any_role("admin", "preparer", "reviewer", "customer")
+        user.require_customer_access(customer_id)
+        if normalize_assessment_year(payload.assessment_year) != normalize_assessment_year(
+            assessment_year
+        ):
+            raise HTTPException(status_code=422, detail="assessment year mismatch")
+        return service.analyze(payload)
+
+    @app.get(
+        "/api/assessment-years/{assessment_year}/customers/{customer_id}/notices",
+        response_model=NoticeCaseList,
+    )
+    def list_notice_cases(
+        assessment_year: str,
+        customer_id: str,
+        service: NoticeService = Depends(notice_api),
+        user: UserContext = Depends(current_user),
+    ) -> NoticeCaseList:
+        user.require_customer_access(customer_id)
+        return service.list(assessment_year, customer_id)
+
+    @app.post(
+        "/api/assessment-years/{assessment_year}/customers/{customer_id}/notices/{case_id}/draft",
+        response_model=ResponseDraft,
+    )
+    def draft_notice_response(
+        assessment_year: str,
+        customer_id: str,
+        case_id: str,
+        service: NoticeService = Depends(notice_api),
+        user: UserContext = Depends(current_user),
+    ) -> ResponseDraft:
+        user.require_any_role("admin", "preparer", "reviewer")
+        user.require_customer_access(customer_id)
+        return service.draft(assessment_year, customer_id, case_id, user.subject)
+
+    @app.post(
+        "/api/assessment-years/{assessment_year}/customers/{customer_id}/notices/{case_id}/review",
+        response_model=ResponseDraft,
+    )
+    def review_notice_response(
+        assessment_year: str,
+        customer_id: str,
+        case_id: str,
+        payload: NoticeReview,
+        service: NoticeService = Depends(notice_api),
+        user: UserContext = Depends(current_user),
+    ) -> ResponseDraft:
+        user.require_any_role("admin", "reviewer")
+        user.require_customer_access(customer_id)
+        return service.review(
+            assessment_year, customer_id, case_id, payload, user.subject
+        )
 
     register_read_routes(app, filing_api, current_user)
     return app
