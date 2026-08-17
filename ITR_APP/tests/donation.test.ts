@@ -1,0 +1,3 @@
+import { describe,expect,it } from "vitest";
+import { calculate80G } from "@/lib/tax/80g";
+describe("80G",()=>{it("rejects cash above the statutory mode threshold",()=>{expect(calculate80G({donatedRupees:2001n,adjustedGrossTotalIncomeRupees:1000000n,category:"FULL_NO_LIMIT",mode:"CASH",evidenceVerified:false}).status).toBe("REJECTED")});it("applies 10% adjusted-GTI and 50% category",()=>{const r=calculate80G({donatedRupees:200000n,adjustedGrossTotalIncomeRupees:1000000n,category:"HALF_QUALIFYING_LIMIT",mode:"NON_CASH",evidenceVerified:true});expect(r.qualifyingContributionRupees).toBe(100000n);expect(r.eligibleDeductionRupees).toBe(50000n)})});

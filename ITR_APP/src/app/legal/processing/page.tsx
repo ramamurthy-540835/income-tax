@@ -1,0 +1,1 @@
+export default function Processing(){return <main className="page"><h1>Data Processing Notice</h1><section className="surface panel"><p>Draft for product development. Production text must identify controllers/processors, purposes, retention, subprocessors, locations, security measures and grievance channels.</p></section></main>}

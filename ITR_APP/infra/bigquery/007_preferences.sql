@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET}.client_preferences` (preference_id STRING NOT NULL,client_id STRING NOT NULL,case_id STRING NOT NULL,assessment_year STRING,preference STRING,confirmation_version STRING,confirmed_at TIMESTAMP,source STRING,status STRING) PARTITION BY DATE(confirmed_at) CLUSTER BY assessment_year,preference;

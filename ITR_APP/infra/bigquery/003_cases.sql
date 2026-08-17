@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET}.cases` (case_id STRING NOT NULL, client_id STRING NOT NULL, assessment_year STRING NOT NULL, status STRING NOT NULL, assigned_staff_id STRING, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL) PARTITION BY DATE(created_at) CLUSTER BY assessment_year,status;

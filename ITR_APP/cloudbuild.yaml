@@ -1,0 +1,24 @@
+substitutions: { _REGION: asia-south1, _SERVICE: taxright-web-staging, _REPOSITORY: taxright }
+steps:
+  - name: node:24
+    entrypoint: npm
+    args: [ci]
+  - name: node:24
+    entrypoint: npm
+    args: [run, lint]
+  - name: node:24
+    entrypoint: npm
+    args: [run, typecheck]
+  - name: node:24
+    entrypoint: npm
+    args: [run, test]
+  - name: node:24
+    entrypoint: npm
+    args: [run, build]
+  - name: gcr.io/cloud-builders/docker
+    args: [build, -t, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA', .]
+  - name: gcr.io/cloud-builders/docker
+    args: [push, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA']
+images: ['${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA']
+options: { logging: CLOUD_LOGGING_ONLY }
+# Deployment is a separately approved promotion step after staging configuration and smoke tests.

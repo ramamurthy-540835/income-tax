@@ -1,0 +1,1 @@
+{"indexes":[{"collectionGroup":"cases","queryScope":"COLLECTION","fields":[{"fieldPath":"owner_uid","order":"ASCENDING"},{"fieldPath":"updated_at","order":"DESCENDING"}]},{"collectionGroup":"documents","queryScope":"COLLECTION_GROUP","fields":[{"fieldPath":"case_id","order":"ASCENDING"},{"fieldPath":"uploaded_at","order":"DESCENDING"}]}],"fieldOverrides":[]}

@@ -1,0 +1,4 @@
+import { describe,expect,it } from "vitest";
+import { renamedDocumentName } from "@/lib/documents/naming";
+import { safeOriginalName,signatureMatches } from "@/lib/documents/security";
+describe("document security",()=>{it("uses a PAN-free deterministic filename",()=>expect(renamedDocumentName({clientId:"0198abcd-0000-7000-8000-000000000000",assessmentYear:"AY2026-27",documentType:"FORM_16_PART_A",issuer:"Example Employer",documentDate:"2026-03-31",sequence:1,extension:"pdf"})).toBe("TRAI_0198AB_AY2026-27_FORM_16_PART_A_EXAMPLE_EMPLOYER_20260331_01.pdf"));it("blocks traversal in original names",()=>expect(safeOriginalName("../../unsafe file.pdf")).not.toContain("/"));it("checks file signatures",()=>expect(signatureMatches(new Uint8Array([0x25,0x50,0x44,0x46]),"application/pdf")).toBe(true))});

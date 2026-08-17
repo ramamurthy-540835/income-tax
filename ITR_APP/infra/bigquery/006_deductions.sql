@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET}.deduction_findings` (deduction_id STRING NOT NULL,case_id STRING NOT NULL,section STRING,status STRING,submitted_amount NUMERIC,eligible_amount NUMERIC,rules_version STRING,created_at TIMESTAMP,reviewed_at TIMESTAMP) PARTITION BY DATE(created_at) CLUSTER BY case_id,status;
+CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET}.deduction_evidence` (deduction_id STRING NOT NULL,document_id STRING NOT NULL,case_id STRING NOT NULL,evidence_status STRING,created_at TIMESTAMP) PARTITION BY DATE(created_at) CLUSTER BY case_id;

@@ -1,0 +1,5 @@
+import { describe,expect,it } from "vitest";
+import { calculateTax } from "@/lib/tax/calculator";
+import type { TaxInput } from "@/lib/tax/types";
+const base:TaxInput={grossIncomeRupees:1200000n,salaryIncomeRupees:1200000n,tdsRupees:0n,ageBand:"BELOW_60",deductions:{section80CGroup:0n,section80CCD1B:0n,section80D:0n,section80TTA:0n,section80TTB:0n,section80G:0n}};
+describe("AY 2026-27 calculator",()=>{it("caps the combined 80C group",()=>{const result=calculateTax({...base,deductions:{...base.deductions,section80CGroup:220000n}},"OLD");expect(result.trace.find(x=>x.section.startsWith("80C"))?.eligibleRupees).toBe(150000n)});it("applies new-regime rebate through 12 lakh taxable income",()=>{const result=calculateTax(base,"NEW");expect(result.totalTaxRupees).toBe(0n)});it("produces immutable comparison-friendly snapshots",()=>{const old=calculateTax(base,"OLD"),next=calculateTax(base,"NEW");expect(old.ruleVersion).toBe(next.ruleVersion);expect(old.regime).toBe("OLD");expect(next.regime).toBe("NEW")})});

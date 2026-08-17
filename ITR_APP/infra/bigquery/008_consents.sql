@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET}.consents` (consent_id STRING NOT NULL,client_id STRING NOT NULL,case_id STRING,consent_type STRING,consent_version STRING,notice_version STRING,accepted BOOL,accepted_at TIMESTAMP,withdrawn_at TIMESTAMP,ip_hash STRING,user_agent_family STRING) PARTITION BY DATE(accepted_at) CLUSTER BY consent_type;

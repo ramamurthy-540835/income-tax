@@ -1,0 +1,1 @@
+export default function Terms(){return <main className="page"><h1>Terms of Service</h1><section className="surface panel"><p>Draft for product development. TaxRight AI provides estimates and evidence-supported preparation assistance. It does not guarantee a refund or replace required professional judgement.</p></section></main>}

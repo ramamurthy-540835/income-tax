@@ -1,0 +1,3 @@
+import { describe,expect,it } from "vitest";
+import { isValidPan,maskPan,normalizePan,panFingerprint } from "@/lib/domain/identity";
+describe("PAN identity",()=>{it("normalizes without exposing it through identifiers",()=>{const normalized=normalizePan(" abcde 1234 f ");expect(isValidPan(normalized)).toBe(true);expect(maskPan(normalized)).toBe("ABCDE****F")});it("creates stable peppered fingerprints",()=>{const pepper="synthetic-test-pepper-with-more-than-32-characters";const a=panFingerprint("ABCDE1234F",pepper);expect(a).toHaveLength(64);expect(a).toBe(panFingerprint(" abcde1234f ",pepper));expect(a).not.toContain("ABCDE")});it("rejects invalid PAN",()=>expect(isValidPan("INVALID")).toBe(false))});

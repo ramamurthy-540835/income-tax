@@ -1,0 +1,15 @@
+.next/
+node_modules/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.local
+.env.*.local
+!.env.example
+*.log
+*.tsbuildinfo
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfplan
