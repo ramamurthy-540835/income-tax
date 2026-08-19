@@ -2,7 +2,57 @@
 
 Last updated: 2026-08-17
 
+## Document Intelligence Agent (DIA)
+
+The independently deployable `services/document-agent` service owns all asynchronous
+document work. Next.js owns authentication, case authorization, document metadata
+creation, and short-lived upload/export orchestration only.
+
+- DIA-1: service package, CloudEvents HTTP boundary, shared schemas, typed errors,
+  configuration, logging, metrics, and explicit processing state machine.
+- DIA-2: quarantine event validation, generation idempotency, immutable-original
+  repository contracts, and local/production storage adapters.
+- DIA-3: magic-byte/MIME/PDF validation, malware-scanner contract, SHA-256, exact
+  duplicate cache, and semantic-duplicate signals.
+- DIA-4: deterministic-first classification, Document AI OCR adapter, optional
+  schema-constrained Vertex classifier, provenance-preserving extraction, confidence,
+  evidence mapping, filename generation, clean-copy promotion, and review routing.
+- DIA-5: AIS JSON/CSV/PDF detection, server-only taxpayer identity lookup, versioned
+  in-memory password conventions, normalization with integer paise, and salary/TDS/
+  interest/tax-payment reconciliation.
+- DIA-6: server-side ZIP exports, short-lived signed URLs, client document status UI,
+  Firestore/BigQuery operational records, and review tasks.
+- DIA-7: Eventarc/Cloud Run/Terraform definitions and synthetic unit/integration/E2E
+  tests. Infrastructure definitions may be planned and validated but not applied.
+
+Current cloud discovery (2026-08-17): project `aidirac-503309`; existing buckets are
+in `ASIA-SOUTH1` with public-access prevention enforced; no Eventarc trigger or
+Document AI processor was visible; no TaxRight-specific BigQuery dataset was returned
+by the current CLI check. The existing Income Tax bucket remains read-only reference
+storage. Production OCR therefore fails closed until processors and least-privilege
+service identities are approved.
+
 ## Current build status
+
+- Income milestone: locally implemented. Authenticated onboarding now persists case
+  ownership, DOB, PAN fingerprint and consent; income documents upload to quarantine,
+  are processed by the agent, expose client-friendly states, and feed an immutable
+  Old/New Regime calculation snapshot. The income UI displays gross salary,
+  exemptions, TDS, taxable income, estimated tax and balance/refund.
+- Income calculations intentionally set Chapter VI-A evidence (including 80C and 80D)
+  to zero until the dedicated deduction phase is implemented and reviewed.
+- Live end-to-end cloud execution still requires Firebase client configuration,
+  approved GCS/Eventarc resources and a Document AI processor; local adapters and
+  synthetic integration tests cover the processing and calculation boundaries.
+- Deduction milestone: locally implemented. Ready insurance, investment, tuition,
+  NPS, eligible loan-interest and bank-interest evidence is mapped to candidate tax
+  sections, capped by the deterministic AY rules, stored as evidence-linked findings,
+  and used only for an explicitly labelled optimized planning comparison. 80G remains
+  excluded until its separate donee/payment/evidence validation flow.
+- PDF extraction order is `pdfplumber` 0.11.10 for text PDFs, Document AI for scanned
+  or image-only documents, then structured validation and review routing.
+- The deductions page supports authenticated evidence upload, processing-state polling,
+  current/optimized tax display, gap analysis and case-authorized renamed ZIP export.
 
 - Architecture/governance documentation: implemented.
 - Next.js product foundation and responsive client/staff experience: implemented.

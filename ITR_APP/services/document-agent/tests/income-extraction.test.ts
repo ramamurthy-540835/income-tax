@@ -1,0 +1,3 @@
+import {describe,expect,it} from "vitest";
+import {extractIncomeFields} from "../src/extraction/income-field-extractor.js";
+describe("income extraction",()=>{it("extracts Form 16 salary and TDS",()=>{const fields=extractIncomeFields("Gross Salary 35,45,750\nTDS 6,82,400\nAllowances exempt 2,40,000\nProfessional Tax 2,500","doc","FORM_16");expect(Object.fromEntries(fields.map(f=>[f.name,f.value]))).toMatchObject({gross_salary_rupees:3545750,tds_rupees:682400,exempt_allowances_rupees:240000,professional_tax_rupees:2500})});it("keeps unknown fields null",()=>expect(extractIncomeFields("FORM 16","doc","FORM_16").find(f=>f.name==="gross_salary_rupees")?.value).toBeNull())});

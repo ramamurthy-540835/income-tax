@@ -1,0 +1,4 @@
+import type { Classification } from "../shared/types.js";
+export interface SemanticFingerprint{documentType:string;issuer:string;date:string;amounts:string;references:string}
+export function semanticFingerprint(c:Classification):SemanticFingerprint{return {documentType:c.documentType,issuer:(c.issuer??"").toUpperCase(),date:c.documentDate??"",amounts:c.fields.filter(f=>/amount|salary|premium|tds/i.test(f.name)).map(f=>String(f.value)).sort().join("|"),references:c.fields.filter(f=>/reference|policy|receipt/i.test(f.name)).map(f=>String(f.value)).sort().join("|")};}
+export const likelySemanticDuplicate=(a:SemanticFingerprint,b:SemanticFingerprint):boolean=>a.documentType===b.documentType&&a.issuer===b.issuer&&a.date===b.date&&Boolean(a.amounts)&&a.amounts===b.amounts&&a.references===b.references;

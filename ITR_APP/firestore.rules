@@ -12,6 +12,10 @@ service cloud.firestore {
       allow read: if staff() || (signedIn() && resource.data.owner_uid == request.auth.uid);
       allow write: if false;
       match /documents/{id} { allow read: if staff() || ownsCase(caseId); allow write: if false; }
+      match /documents/{id}/extractions/{version} { allow read: if staff() || ownsCase(caseId); allow write: if false; }
+      match /documents/{id}/renames/{renameId} { allow read: if staff() || ownsCase(caseId); allow write: if false; }
+      match /reconciliations/{id} { allow read: if staff() || ownsCase(caseId); allow write: if false; }
+      match /reviewTasks/{id} { allow read: if staff() || ownsCase(caseId); allow write: if false; }
       match /consents/{id} { allow read: if staff() || ownsCase(caseId); allow write: if false; }
       match /preferences/{id} { allow read: if staff() || ownsCase(caseId); allow write: if false; }
       match /calculations/{id} { allow read: if staff() || ownsCase(caseId); allow write: if false; }
@@ -20,6 +24,7 @@ service cloud.firestore {
       match /activity/{id} { allow read: if staff() || ownsCase(caseId); allow write: if false; }
     }
     match /staff/{uid} { allow read: if staff(); allow write: if false; }
+    match /documentProcessing/{id} { allow read, write: if false; }
     match /{document=**} { allow read, write: if false; }
   }
 }

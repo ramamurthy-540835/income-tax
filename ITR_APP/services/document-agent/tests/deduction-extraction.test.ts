@@ -1,0 +1,3 @@
+import {describe,expect,it} from "vitest";
+import {classifyDeterministically} from "../src/classification/deterministic-classifier.js";
+describe("deduction evidence",()=>{it("classifies and extracts health premium",()=>{const c=classifyDeterministically("Health Insurance Premium Receipt\nPremium paid Rs. 24,885","IMG_1.pdf","doc","AY2026-27");expect(c.documentType).toBe("HEALTH_INSURANCE_PREMIUM");expect(c.fields.find(f=>f.name==="deduction_amount_rupees")?.value).toBe(24885)});it("classifies tuition evidence without approving it",()=>expect(classifyDeterministically("School Tuition Fee Amount paid 45,000","receipt.pdf","doc","AY2026-27").documentType).toBe("TUITION_FEE_RECEIPT"))});

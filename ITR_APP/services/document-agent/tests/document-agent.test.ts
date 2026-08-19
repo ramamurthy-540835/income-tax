@@ -1,0 +1,22 @@
+import {describe,expect,it} from "vitest";
+import {buildFilename} from "../src/rename/filename-builder.js";
+import {issuerSlug} from "../src/rename/issuer-slug.js";
+import {sha256} from "../src/duplicate/checksum.js";
+import {detectMime} from "../src/security/mime-validator.js";
+import {classifyDeterministically} from "../src/classification/deterministic-classifier.js";
+import {combinedConfidence,reviewDecision} from "../src/review/confidence-engine.js";
+import {normalizeAisRows} from "../src/ais/ais-normalizer.js";
+import {resolveAisPassword,verifiedConventions} from "../src/ais/ais-password-resolver.js";
+import {reconcileAmount} from "../src/reconciliation/reconciliation-engine.js";
+import {mapTaxEvidence} from "../src/evidence/tax-evidence-mapper.js";
+describe("document intelligence primitives",()=>{
+ it("builds PAN-free standard names",()=>{const name=buildFilename({clientId:"019abc00-a72d-91ff-8000-000000000001",assessmentYear:"AY2026-27",documentType:"FORM_16",issuer:"Test Employer Pvt. Ltd.",documentDate:"2026-03-31",sequence:1,extension:"pdf",fallbackDate:"2026-08-17"});expect(name).toBe("TRAI_000001_AY2026-27_FORM16_TESTEMPLOYERPVTLTD_20260331_01.pdf");expect(name).not.toMatch(/[A-Z]{5}\d{4}[A-Z]/)});
+ it("slugs issuers",()=>expect(issuerSlug("Star Health & Allied")).toBe("STARHEALTHALLIED"));
+ it("hashes and detects signatures",()=>{expect(sha256(Buffer.from("abc"))).toHaveLength(64);expect(detectMime(Buffer.from("%PDF-1.7\n%%EOF"))).toBe("application/pdf")});
+ it("classifies Form 16 deterministically",()=>expect(classifyDeterministically("FORM NO. 16\nEmployer Name: TEST EMPLOYER","random.pdf","doc","AY2026-27").documentType).toBe("FORM_16"));
+ it("calculates confidence and review thresholds",()=>{expect(combinedConfidence({deterministic:1,ocr:1,schema:1,issuer:1,date:1,taxConsistency:1,ai:1})).toBe(1);expect(reviewDecision(.74)).toBe("REVIEW_REQUIRED")});
+ it("normalizes AIS money to paise",()=>{const [r]=normalizeAisRows([{description:"Salary",amount:"35,45,750.25"}],{clientId:"c",caseId:"k",documentId:"d",financialYear:"FY2025-26",assessmentYear:"AY2026-27"});expect(r?.category).toBe("SALARY");expect(r?.reportedAmountPaise).toBe(354575025n)});
+ it("does not guess AIS passwords without verified conventions",()=>{expect(verifiedConventions).toHaveLength(0);expect(resolveAisPassword({pan:"AAAAA0000A",dateOfBirth:"1990-01-01",documentMetadata:{},tryPassword:()=>true})).toBeNull()});
+ it("reconciles with one-rupee tolerance",()=>expect(reconcileAmount(10000n,9900n).status).toBe("MATCHED_WITH_TOLERANCE"));
+ it("maps evidence as candidate only",()=>expect(mapTaxEvidence("HEALTH_INSURANCE_PREMIUM")).toEqual({candidateSections:["80D"],status:"POTENTIALLY_ELIGIBLE"}));
+});

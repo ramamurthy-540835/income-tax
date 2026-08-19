@@ -1,0 +1,9 @@
+import {Firestore} from "@google-cloud/firestore";
+import {NextRequest,NextResponse} from "next/server";
+import {requireAuthenticatedUser} from "@/lib/auth/server";
+import {apiError} from "@/lib/api/errors";
+import {requestId} from "@/lib/api/request";
+import {requireCloudConfiguration} from "@/lib/env";
+const friendly:Record<string,string>={AWAITING_UPLOAD:"Uploaded",UPLOADED:"Uploaded",SECURITY_CHECK:"Securing",DUPLICATE_CHECK:"Securing",CLASSIFYING:"Understanding document",PASSWORD_RESOLUTION:"Reading",OCR_PROCESSING:"Reading",EXTRACTING:"Understanding document",VALIDATING:"Checking details",MAPPING_EVIDENCE:"Checking details",RENAMING:"Checking details",RECONCILING:"Checking details",READY:"Ready",REVIEW_REQUIRED:"Needs review",FAILED:"Unable to process",DUPLICATE:"Needs review",REJECTED:"Unable to process"};
+export const runtime="nodejs";
+export async function GET(request:NextRequest,{params}:{params:Promise<{caseId:string}>}){const id=requestId(request);try{const user=await requireAuthenticatedUser(request);const {caseId}=await params,env=requireCloudConfiguration(),db=new Firestore({projectId:env.GCP_PROJECT_ID,databaseId:env.FIRESTORE_DATABASE_ID});const c=await db.doc(`cases/${caseId}`).get();if(!c.exists||c.get("owner_uid")!==user.uid)throw Object.assign(new Error("Case not found"),{status:404});const docs=await db.collection(`cases/${caseId}/documents`).orderBy("createdAt","desc").get();return NextResponse.json({documents:docs.docs.map(d=>{const x=d.data();return {documentId:d.id,documentType:x.documentType,issuer:x.issuer,documentDate:x.documentDate,status:x.processingStatus,friendlyStatus:friendly[x.processingStatus]??"Processing",renamedFilename:x.renamedFilename,originalFilename:x.originalFilename,confidence:x.confidence}})},{headers:{"cache-control":"no-store"}})}catch(error){return apiError(error,id)}}

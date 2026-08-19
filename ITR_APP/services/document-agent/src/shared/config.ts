@@ -1,0 +1,4 @@
+import { z } from "zod";
+const schema=z.object({PORT:z.coerce.number().int().positive().default(8080),APP_ENV:z.enum(["local","dev","staging","prod"]).default("local"),GCP_PROJECT_ID:z.string().min(1),GCS_QUARANTINE_BUCKET:z.string().min(1),GCS_DOCUMENT_BUCKET:z.string().min(1),GCS_EXPORT_BUCKET:z.string().min(1),BQ_DATASET:z.string().min(1),DOCUMENT_AI_LOCATION:z.string().min(1),DOCUMENT_AI_OCR_PROCESSOR_ID:z.string().optional(),VERTEX_CLASSIFICATION_MODEL:z.string().optional(),MAX_FILE_BYTES:z.coerce.number().int().positive().default(25_000_000),PROCESSING_VERSION:z.string().default("doc-agent-1.0.0"),AUTO_PROCESS_THRESHOLD:z.coerce.number().min(0).max(1).default(.9),REVIEW_THRESHOLD:z.coerce.number().min(0).max(1).default(.75)});
+export type Config=z.infer<typeof schema>;
+export const loadConfig=(env:NodeJS.ProcessEnv=process.env):Config=>schema.parse(env);

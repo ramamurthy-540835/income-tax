@@ -1,8 +1,11 @@
-import { NextRequest,NextResponse } from "next/server";
-import { createCaseSchema } from "@/lib/domain/schemas";
-import { newCaseId,newClientId,panFingerprint } from "@/lib/domain/identity";
-import { requireAuthenticatedUser } from "@/lib/auth/server";
-import { apiError } from "@/lib/api/errors";
-import { rateLimit,requestId,requireSameOrigin } from "@/lib/api/request";
-import { auditLog } from "@/lib/security/logging";
-export async function POST(request:NextRequest){const id=requestId(request);try{requireSameOrigin(request);const user=await requireAuthenticatedUser(request);rateLimit(user.uid,10);const body=createCaseSchema.parse(await request.json());const pepper=process.env.PAN_HMAC_PEPPER;if(!pepper)throw new Error("PAN fingerprint service is not configured");const clientId=newClientId(),caseId=newCaseId();const fingerprint=panFingerprint(body.profile.pan,pepper);auditLog({event_type:"CASE_CREATE_REQUESTED",case_id:caseId,actor_id:user.uid,status:"accepted"});return NextResponse.json({clientId,caseId,status:"DRAFT",panFingerprintStored:Boolean(fingerprint)},{status:201,headers:{"cache-control":"no-store"}})}catch(error){return apiError(error,id)}}
+import {Firestore,Timestamp} from "@google-cloud/firestore";
+import {NextRequest,NextResponse} from "next/server";
+import {createCaseSchema} from "@/lib/domain/schemas";
+import {newCaseId,newClientId,panFingerprint} from "@/lib/domain/identity";
+import {requireAuthenticatedUser} from "@/lib/auth/server";
+import {apiError} from "@/lib/api/errors";
+import {rateLimit,requestId,requireSameOrigin} from "@/lib/api/request";
+import {auditLog} from "@/lib/security/logging";
+import {requireCloudConfiguration} from "@/lib/env";
+export const runtime="nodejs";
+export async function POST(request:NextRequest){const id=requestId(request);try{requireSameOrigin(request);const user=await requireAuthenticatedUser(request);rateLimit(user.uid,10);const body=createCaseSchema.parse(await request.json()),pepper=process.env.PAN_HMAC_PEPPER;if(!pepper)throw new Error("PAN fingerprint service is not configured");const env=requireCloudConfiguration(),db=new Firestore({projectId:env.GCP_PROJECT_ID,databaseId:env.FIRESTORE_DATABASE_ID}),fingerprint=panFingerprint(body.profile.pan,pepper),indexRef=db.doc(`pan_index/${fingerprint}`),caseId=newCaseId(),now=Timestamp.now();let clientId="";await db.runTransaction(async transaction=>{const existing=await transaction.get(indexRef);if(existing.exists){if(existing.get("owner_uid")!==user.uid)throw Object.assign(new Error("This PAN is already associated with another secured account."),{status:409});clientId=String(existing.get("client_id"))}else{clientId=newClientId();transaction.create(indexRef,{client_id:clientId,owner_uid:user.uid,created_at:now});transaction.create(db.doc(`clients/${clientId}`),{clientId,owner_uid:user.uid,fullName:body.profile.fullName,email:body.profile.email,mobile:body.profile.mobile,maskedPan:`${body.profile.pan.slice(0,5)}****${body.profile.pan.slice(-1)}`,createdAt:now});transaction.create(db.doc(`clients/${clientId}/private/identity`),{dateOfBirth:body.profile.dateOfBirth,createdAt:now})}const caseRef=db.doc(`cases/${caseId}`);transaction.create(caseRef,{caseId,clientId,owner_uid:user.uid,assessmentYear:body.profile.assessmentYear,status:"DRAFT",createdAt:now,updatedAt:now});transaction.create(caseRef.collection("consents").doc(),{consent_id:crypto.randomUUID(),client_id:clientId,case_id:caseId,consent_type:"TAX_CASE_PROCESSING",consent_version:body.processingConsent.consentVersion,notice_version:body.processingConsent.noticeVersion,accepted:true,accepted_at:now,user_agent_family:request.headers.get("user-agent")?.slice(0,120)??"unknown"})});auditLog({event_type:"CASE_CREATED",case_id:caseId,actor_id:user.uid,status:"accepted"});return NextResponse.json({clientId,caseId,status:"DRAFT"},{status:201,headers:{"cache-control":"no-store"}})}catch(error){return apiError(error,id)}}

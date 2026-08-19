@@ -1,0 +1,2 @@
+import { DocumentAgentError } from "../shared/errors.js";
+export function inspectPdf(bytes:Buffer):{encrypted:boolean;pageEstimate:number}{const text=bytes.toString("latin1");if(!text.startsWith("%PDF-")||!text.includes("%%EOF"))throw new DocumentAgentError("PDF_CORRUPT","PDF structure is incomplete");const pages=Math.max(1,(text.match(/\/Type\s*\/Page\b/g)??[]).length);return {encrypted:/\/Encrypt\b/.test(text),pageEstimate:pages};}

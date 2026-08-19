@@ -1,1 +1,1 @@
-CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET}.clients` (client_id STRING NOT NULL, pan_fingerprint STRING, lifecycle_status STRING, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL) PARTITION BY DATE(created_at) CLUSTER BY lifecycle_status;
+CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET}.clients` (client_id STRING NOT NULL, firebase_uid_hash STRING NOT NULL, pan_fingerprint STRING, lifecycle_status STRING, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL) PARTITION BY DATE(created_at) CLUSTER BY lifecycle_status;

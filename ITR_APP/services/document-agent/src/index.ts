@@ -1,0 +1,15 @@
+import { loadConfig } from "./shared/config.js";
+import { GcsObjectStore } from "./storage/gcs.js";
+import { FirestoreDocumentRepository } from "./storage/firestore.js";
+import { BigQueryEventSink } from "./storage/bigquery.js";
+import { DocumentPipeline } from "./pipeline/document-pipeline.js";
+import { DocumentAiExtractor } from "./extraction/document-ai.js";
+import { FallbackExtractor,PdfPlumberExtractor } from "./extraction/pdfplumber.js";
+import { LogMetrics } from "./observability/metrics.js";
+import { createDocumentAgentServer } from "./server.js";
+const config=loadConfig();
+const processor=config.DOCUMENT_AI_OCR_PROCESSOR_ID?`projects/${config.GCP_PROJECT_ID}/locations/${config.DOCUMENT_AI_LOCATION}/processors/${config.DOCUMENT_AI_OCR_PROCESSOR_ID}`:null;
+if(config.APP_ENV!=="local"&&!processor)throw new Error("DOCUMENT_AI_OCR_PROCESSOR_ID is required outside local mode");
+const extractor=processor?new FallbackExtractor(new PdfPlumberExtractor(),new DocumentAiExtractor(processor)):new PdfPlumberExtractor();
+const pipeline=new DocumentPipeline({config,objects:new GcsObjectStore(config.GCS_DOCUMENT_BUCKET,config.GCS_EXPORT_BUCKET),documents:new FirestoreDocumentRepository(),events:new BigQueryEventSink(config.BQ_DATASET),extractor,metrics:new LogMetrics()});
+createDocumentAgentServer(pipeline).listen(config.PORT,"0.0.0.0");

@@ -1,0 +1,4 @@
+import {describe,expect,it} from "vitest";
+import {analyseDeductionEvidence} from "@/lib/tax/deduction-evidence";
+const doc=(id:string,type:string,value:number)=>({documentId:id,documentType:type,fields:[{name:"deduction_amount_rupees",value,confidence:.9}]});
+describe("deduction evidence analysis",()=>{it("combines and caps 80C evidence",()=>{const result=analyseDeductionEvidence([doc("a","LIFE_INSURANCE_PREMIUM",100000),doc("b","PPF",80000)],"BELOW_60");expect(result.deductions.section80CGroup).toBe(150000n);expect(result.gaps[0]?.remainingRupees).toBe(0n)});it("uses conservative 80D self/family limit",()=>expect(analyseDeductionEvidence([doc("a","HEALTH_INSURANCE_PREMIUM",42000)],"BELOW_60").deductions.section80D).toBe(25000n));it("keeps 80G out of automatic deduction",()=>expect(analyseDeductionEvidence([doc("a","DONATION_80G",50000)],"BELOW_60").deductions.section80G).toBe(0n))});

@@ -1,0 +1,2 @@
+export type ErrorCode = "INVALID_EVENT"|"INVALID_FILE_TYPE"|"FILE_TOO_LARGE"|"MALWARE_DETECTED"|"MALWARE_SCAN_FAILED"|"PDF_CORRUPT"|"PDF_PASSWORD_UNRESOLVED"|"DOCUMENT_AI_FAILED"|"CLASSIFICATION_LOW_CONFIDENCE"|"EXTRACTION_FAILED"|"DUPLICATE_DOCUMENT"|"GCS_COPY_FAILED"|"RECONCILIATION_FAILED"|"CONFIGURATION_ERROR";
+export class DocumentAgentError extends Error { constructor(readonly code:ErrorCode,message:string,readonly retryable=false){super(message);this.name="DocumentAgentError";} }

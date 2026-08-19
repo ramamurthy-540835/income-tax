@@ -1,5 +1,19 @@
 # Threat Model
 
+## Document-agent boundary
+
+- Quarantine is the only upload destination; clean storage accepts only agent-promoted
+  objects after signature, structural, size, and malware checks.
+- Redelivery is constrained by document ID, GCS generation, checksum, and processing
+  version. Originals remain immutable and clean-object writes use preconditions.
+- OCR text is untrusted and cannot choose identity, invoke tools, request secrets,
+  change rules, or approve evidence. AI output is schema-constrained and non-authoritative.
+- PAN/DOB lookup is privileged. Derived AIS passwords are ephemeral and forbidden from
+  Firestore, BigQuery, GCS metadata, prompts, and logs.
+- The service identity has no credential-vault decrypt, portal credential, OTP, EVC,
+  filing-agent, project-admin, or owner permission.
+- Exports are case-scoped, randomly named, server-generated, short-lived, and private.
+
 | Threat | Control | Residual/manual requirement |
 |---|---|---|
 | PAN exposure | No PAN in IDs/URLs/logs; server HMAC fingerprint; masked display; KMS design for persisted raw PAN | Provision pepper and KMS; approve retention need |
@@ -19,4 +33,3 @@
 | Forged consent | Authenticated versioned server event, timestamp and minimal IP hash | Approved legal notice/version process |
 
 Uploaded text can never change system instructions, case identity, statutory rules, permissions, payment actions, or review status. AI output can produce only provisional findings and cannot produce `VERIFIED` without deterministic validation and reviewer action.
-

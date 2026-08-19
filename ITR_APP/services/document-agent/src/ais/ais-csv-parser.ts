@@ -1,0 +1,1 @@
+export function parseAisCsv(bytes:Buffer):Record<string,unknown>[]{const lines=bytes.toString("utf8").replace(/^\uFEFF/,"").split(/\r?\n/).filter(Boolean);const headers=(lines.shift()??"").split(",").map(x=>x.trim());return lines.map(line=>Object.fromEntries(line.split(",").map((v,i)=>[headers[i]??`column_${i}`,v.trim()])));}

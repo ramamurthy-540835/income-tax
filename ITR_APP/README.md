@@ -1,5 +1,22 @@
 # TaxRight AI
 
+## Document Intelligence Agent
+
+`services/document-agent` is an independent Cloud Run service. It validates and scans
+quarantine objects, detects duplicates, performs deterministic-first classification
+and Document AI OCR, records provenance, maps candidate evidence, creates PAN-free
+standard filenames, preserves originals, promotes clean copies, normalizes AIS data,
+reconciles evidence, routes exceptions, and builds server-side ZIP exports.
+
+Run locally with `npm ci`, `npm run typecheck`, and `npm test` from that directory.
+Production activation requires an approved Document AI processor, malware backend,
+private Eventarc invocation, least-privilege identity, and reviewed Terraform plan.
+Encrypted AIS fails closed until an authoritative password convention is verified.
+
+Digitally generated PDFs are read with pinned `pdfplumber` 0.11.10 inside the service
+container. Documents with insufficient embedded text fall back to Document AI OCR.
+The browser never runs PDF extraction or controls the final filename.
+
 AI-assisted tax intelligence with human review for Indian income-tax return preparation. The application is designed to find every lawfully available, evidence-supported tax benefit while retaining deterministic calculation traces and immutable provenance.
 
 ## Current implementation

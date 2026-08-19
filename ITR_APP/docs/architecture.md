@@ -9,7 +9,7 @@ flowchart LR
   N --> F[(Firestore)]
   N --> S[Private GCS]
   S --> E[Eventarc]
-  E --> W[Document worker]
+  E --> W[TaxRight Document Intelligence Agent]
   W --> M[Malware and file validation]
   W --> D[Document AI]
   W --> V[Vertex AI structured extraction]
@@ -88,3 +88,32 @@ flowchart LR
 - Worker identities are separate from web identities and receive only bucket/collection permissions needed for their tasks.
 - Existing income-tax and trust-document storage is read-only reference data and is not copied into development.
 
+## Document Intelligence Agent
+
+```mermaid
+flowchart TD
+  U[Authenticated metadata] --> Q[Private quarantine object]
+  Q --> E[Eventarc finalize event]
+  E --> I[Generation idempotency]
+  I --> S[Signature, PDF and malware checks]
+  S --> H[SHA-256 and duplicate detection]
+  H --> C[Deterministic classification]
+  C --> P[pdfplumber text extraction]
+  P -->|insufficient embedded text| O[Document AI OCR]
+  P -->|usable text| X
+  O --> V[Optional structured Vertex analysis]
+  V --> X[Provenance extraction and validation]
+  X --> A{AIS / TIS / 26AS?}
+  A -->|yes| R[Normalize and reconcile]
+  A -->|no| M[Candidate evidence mapping]
+  R --> N[Standard filename]
+  M --> N
+  N --> G[Immutable original and clean copy]
+  G --> F[(Firestore and review tasks)]
+  G --> B[(BigQuery events)]
+```
+
+The agent has no credential-vault, e-Filing password, OTP, EVC, or filing-session
+access. AIS password candidates may only come from versioned verified conventions,
+are derived in memory, and are never logged or persisted. The convention list starts
+empty and fails closed.

@@ -1,5 +1,17 @@
 # Data Dictionary
 
+## Document intelligence additions
+
+`cases/{caseId}/documents/{documentId}` stores original/processed object references,
+original/renamed filenames, classification, issuer/date, SHA-256, GCS generation,
+processing version/state, confidence, and evidence state. Object references and names
+are `CONFIDENTIAL`; processing metadata is `INTERNAL`; raw bytes are `HIGHLY_SENSITIVE`.
+
+Versioned extractions store value, confidence, source document/page/region, method,
+extractor/version, validation, and review state. Values inherit their source field's
+classification. Reconciliations contain integer-paise amounts and evidence references
+and are `CONFIDENTIAL`. `documentProcessing` idempotency records are server-only.
+
 Classification: `PUBLIC`, `INTERNAL`, `CONFIDENTIAL`, `HIGHLY_SENSITIVE`.
 
 ## Firestore
@@ -54,4 +66,3 @@ The SQL migrations define `clients`, `cases`, `documents`, `document_extractions
 - Income, deductions and tax values are CONFIDENTIAL.
 - `pan_fingerprint` is HIGHLY_SENSITIVE and must be policy-tagged/restricted.
 - Raw PAN, Aadhaar, OCR body, signed URLs and document bytes are prohibited from ordinary analytics tables.
-
