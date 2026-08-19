@@ -1,0 +1,11 @@
+[
+  {
+    "origin": [
+      "https://taxright-web-preview-foovqasysa-el.a.run.app",
+      "https://taxright-web-preview-624683933018.asia-south1.run.app"
+    ],
+    "method": ["PUT"],
+    "responseHeader": ["Content-Type", "x-goog-generation"],
+    "maxAgeSeconds": 600
+  }
+]

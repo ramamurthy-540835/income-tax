@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET}.document_processing_events` (
-  event_id STRING NOT NULL, event_type STRING NOT NULL, case_id STRING NOT NULL,
+  event_id STRING NOT NULL, event_type STRING NOT NULL, client_id STRING NOT NULL, case_id STRING NOT NULL,
   document_id STRING NOT NULL, document_type STRING, processing_stage STRING,
   status STRING NOT NULL, confidence FLOAT64, processing_version STRING NOT NULL,
   processing_duration_ms INT64, error_code STRING, occurred_at TIMESTAMP NOT NULL

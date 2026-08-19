@@ -1,0 +1,6 @@
+{
+  "records": [
+    { "description": "Salary", "amount": "1200000", "source": "SYNTHETIC EMPLOYER" },
+    { "description": "TDS", "amount": "125000", "source": "SYNTHETIC EMPLOYER" }
+  ]
+}

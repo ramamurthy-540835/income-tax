@@ -53,6 +53,10 @@ service identities are approved.
   or image-only documents, then structured validation and review routing.
 - The deductions page supports authenticated evidence upload, processing-state polling,
   current/optimized tax display, gap analysis and case-authorized renamed ZIP export.
+- Case creation now writes a server-only analytics outbox event and attempts idempotent
+  BigQuery client/case synchronization using `client_id`, `case_id`, and a one-way
+  Firebase UID hash. BigQuery failures do not lose the case; they remain retryable in
+  `analyticsOutbox` and never receive raw PAN.
 
 - Architecture/governance documentation: implemented.
 - Next.js product foundation and responsive client/staff experience: implemented.
@@ -166,3 +170,15 @@ The full cloud document pipeline, live Firebase providers, malware service, Docu
 - Approve Terraform plan for TaxRight-specific buckets, identities, KMS, Secret Manager, BigQuery, Eventarc, Artifact Registry, and Cloud Run.
 - Supply approved privacy notice, terms, retention schedule, tax-rule sign-off, and reviewer operating procedure.
 - Provision synthetic-only staging fixtures; never copy production taxpayer documents into development.
+
+## Staging deployment — 19 August 2026
+
+- Live web/API: `taxright-web-preview` in `asia-south1`.
+- Private worker: `taxright-document-agent-staging` in `asia-south1`.
+- Eventarc quarantine object-finalize trigger is active.
+- Firebase Authentication email/password provider and runtime client configuration are active.
+- Firestore remains the operational source; `taxright_staging` contains 11 versioned BigQuery migrations.
+- Three staging-only buckets are private; quarantine CORS is origin restricted and exports expire after one day.
+- Document AI OCR processor is provisioned in `asia-south1`.
+- Live synthetic acceptance passed: sign-up, case creation, signed upload, Eventarc delivery, AIS classification, automatic rename, processed-object storage, and Firestore `READY`.
+- Production deployment remains intentionally unapproved and unperformed.

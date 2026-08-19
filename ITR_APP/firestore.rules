@@ -25,6 +25,7 @@ service cloud.firestore {
     }
     match /staff/{uid} { allow read: if staff(); allow write: if false; }
     match /documentProcessing/{id} { allow read, write: if false; }
+    match /analyticsOutbox/{id} { allow read, write: if false; }
     match /{document=**} { allow read, write: if false; }
   }
 }

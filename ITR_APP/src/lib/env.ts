@@ -7,6 +7,9 @@ const schema = z.object({
   GCP_PROJECT_ID: z.string().min(1).optional(),
   GCP_REGION: z.string().default("asia-south1"),
   FIREBASE_PROJECT_ID: z.string().min(1).optional(),
+  FIREBASE_API_KEY: z.string().min(1).optional(),
+  FIREBASE_AUTH_DOMAIN: z.string().min(1).optional(),
+  FIREBASE_APP_ID: z.string().min(1).optional(),
   FIREBASE_CLIENT_EMAIL: z.email().optional(),
   FIREBASE_PRIVATE_KEY: z.string().min(1).optional(),
   FIRESTORE_DATABASE_ID: z.string().default("(default)"),
@@ -25,6 +28,12 @@ let cached: ServerEnv | undefined;
 export function serverEnv(): ServerEnv {
   if (!cached) cached = schema.parse(process.env);
   return cached;
+}
+
+export function requireFirebaseClientConfiguration() {
+  const env = serverEnv();
+  if (!env.FIREBASE_API_KEY || !env.FIREBASE_AUTH_DOMAIN || !env.FIREBASE_PROJECT_ID || !env.FIREBASE_APP_ID) throw new Error("Firebase client authentication is not configured.");
+  return { apiKey: env.FIREBASE_API_KEY, authDomain: env.FIREBASE_AUTH_DOMAIN, projectId: env.FIREBASE_PROJECT_ID, appId: env.FIREBASE_APP_ID };
 }
 
 export function requireCloudConfiguration(): ServerEnv & Required<Pick<ServerEnv, "GCP_PROJECT_ID" | "FIREBASE_PROJECT_ID" | "GCS_QUARANTINE_BUCKET" | "GCS_DOCUMENT_BUCKET" | "GCS_EXPORT_BUCKET">> {

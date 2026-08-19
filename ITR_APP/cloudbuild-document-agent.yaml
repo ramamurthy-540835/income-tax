@@ -1,4 +1,4 @@
-substitutions: { _REGION: asia-south1, _SERVICE: taxright-document-agent-staging, _REPOSITORY: taxright }
+substitutions: { _REGION: asia-south1, _SERVICE: taxright-document-agent-staging, _REPOSITORY: cloud-run-source-deploy, _TAG: staging }
 steps:
   - name: node:24
     dir: services/document-agent
@@ -13,9 +13,9 @@ steps:
     entrypoint: npm
     args: [test]
   - name: gcr.io/cloud-builders/docker
-    args: [build, -t, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA', services/document-agent]
+    args: [build, -t, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:${_TAG}', services/document-agent]
   - name: gcr.io/cloud-builders/docker
-    args: [push, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA']
-images: ['${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA']
+    args: [push, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:${_TAG}']
+images: ['${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:${_TAG}']
 options: { logging: CLOUD_LOGGING_ONLY }
 # Terraform-controlled deployment follows an approved staging plan.

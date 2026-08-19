@@ -1,4 +1,4 @@
-substitutions: { _REGION: asia-south1, _SERVICE: taxright-web-staging, _REPOSITORY: taxright }
+substitutions: { _REGION: asia-south1, _SERVICE: taxright-web-staging, _REPOSITORY: cloud-run-source-deploy, _TAG: staging }
 steps:
   - name: node:24
     entrypoint: npm
@@ -16,9 +16,9 @@ steps:
     entrypoint: npm
     args: [run, build]
   - name: gcr.io/cloud-builders/docker
-    args: [build, -t, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA', .]
+    args: [build, -t, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:${_TAG}', .]
   - name: gcr.io/cloud-builders/docker
-    args: [push, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA']
-images: ['${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA']
+    args: [push, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:${_TAG}']
+images: ['${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:${_TAG}']
 options: { logging: CLOUD_LOGGING_ONLY }
 # Deployment is a separately approved promotion step after staging configuration and smoke tests.

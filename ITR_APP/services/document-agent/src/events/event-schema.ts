@@ -1,4 +1,4 @@
-import { z } from "zod";
-import type { PipelineEvent } from "../shared/types.js";
+import {z} from "zod";
+import type {PipelineEvent} from "../shared/types.js";
 const cloudEvent=z.object({id:z.string().min(1),source:z.string(),type:z.string(),data:z.object({bucket:z.string().min(1),name:z.string().min(1),generation:z.union([z.string(),z.number()]).transform(String),contentType:z.string().nullable().optional(),size:z.union([z.string(),z.number()]).transform(Number).nullable().optional()})});
-export function parseGcsEvent(input:unknown):PipelineEvent{const e=cloudEvent.parse(input);const match=/^incoming\/([^/]+)\/([^/]+)\/original$/.exec(e.data.name);if(!match?.[1]||!match[2])throw new Error("Unexpected quarantine object path");return {eventId:e.id,bucket:e.data.bucket,objectName:e.data.name,generation:e.data.generation,contentType:e.data.contentType??null,size:e.data.size??null,caseId:match[1],documentId:match[2]};}
+export function parseGcsEvent(input:unknown):PipelineEvent{const event=cloudEvent.parse(input),match=/^(?:users\/[^/]+\/)?incoming\/([^/]+)\/([^/]+)\/original$/.exec(event.data.name);if(!match?.[1]||!match[2])throw new Error("Unexpected quarantine object path");return {eventId:event.id,bucket:event.data.bucket,objectName:event.data.name,generation:event.data.generation,contentType:event.data.contentType??null,size:event.data.size??null,caseId:match[1],documentId:match[2]}}
