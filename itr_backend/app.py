@@ -215,6 +215,7 @@ def create_app(
         )
 
     @app.get("/healthz", response_model=HealthResponse)
+    @app.get("/api/healthz", response_model=HealthResponse)
     def health() -> HealthResponse:
         return HealthResponse(status="ok")
 
