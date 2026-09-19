@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 DocumentCategory = Literal[
     "ais",
     "form16",
+    "payslip",
     "26as",
     "tis",
     "bank",

@@ -46,3 +46,27 @@ isolated by AY.
 AY 2027-28 remains disabled until the department publishes the notified form,
 schema, validation rules, and utility. Follow `TAX_YEAR_RUNBOOK.md`; do not copy
 AY 2026-27 tax rules forward without official artifacts and regression tests.
+
+## Cloud Build deployment
+
+The repository includes `cloudbuild.yaml` at the repository root. It runs both
+test suites, builds `itr_backend/Dockerfile`, pushes the image to Artifact
+Registry, and deploys the `income-tax-api` Cloud Run service.
+
+Before running the build, create the Artifact Registry repository and runtime
+service account, grant the runtime account Firestore and bucket access, and set
+a real Google OAuth web-client ID in the Cloud Build trigger or command:
+
+```bash
+gcloud artifacts repositories create income-tax \
+  --repository-format=docker --location=asia-south1 \
+  --project=aidirac-503309
+
+gcloud builds submit . --config=cloudbuild.yaml \
+  --substitutions=_GOOGLE_OAUTH_CLIENT_ID=YOUR_WEB_CLIENT_ID,_TAG=$BUILD_ID \
+  --project=aidirac-503309
+```
+
+The Cloud Run service is intentionally reachable at the platform edge so the
+application can validate Google OAuth bearer tokens itself. Do not remove the
+Google authentication requirement or deploy with `AUTH_MODE=development`.

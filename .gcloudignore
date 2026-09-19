@@ -1,0 +1,7 @@
+# Keep source and tests available to Cloud Build; exclude local state.
+.git
+.venv
+.env
+__pycache__
+*.pyc
+.pytest_cache
