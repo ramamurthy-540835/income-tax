@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
+import os
 from functools import lru_cache
 from typing import Annotated, Literal
 
@@ -16,7 +18,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import Response as RawResponse
+from fastapi.responses import HTMLResponse, Response as RawResponse
 from google.cloud import firestore, storage
 
 from itr_backend.audit import FirestoreAuditRepository
@@ -214,10 +216,26 @@ def create_app(
             media_type="application/json",
         )
 
+    @app.get("/", response_class=HTMLResponse)
+    def customer_home() -> HTMLResponse:
+        html = (Path(__file__).with_name("customer_app.html")).read_text(encoding="utf-8")
+        client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
+        return HTMLResponse(html.replace("__GOOGLE_OAUTH_CLIENT_ID__", client_id))
+
     @app.get("/healthz", response_model=HealthResponse)
     @app.get("/api/healthz", response_model=HealthResponse)
     def health() -> HealthResponse:
         return HealthResponse(status="ok")
+
+    @app.get("/api/me")
+    def me(user: UserContext = Depends(current_user)) -> dict[str, object]:
+        return {
+            "subject": user.subject,
+            "email": user.email,
+            "roles": sorted(user.roles),
+            "customer_ids": sorted(user.customer_ids),
+            "all_customers": user.all_customers,
+        }
 
     @app.get("/api/tax-years", response_model=list[TaxYearDescriptor])
     def tax_years(

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Income Tax Customer Workspace</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    :root{font-family:Arial,sans-serif;color:#1d2939;background:#f4f7fb}body{margin:0}.wrap{max-width:960px;margin:0 auto;padding:28px 18px}.hero,.card{background:#fff;border-radius:14px;box-shadow:0 2px 12px #14213d12;padding:24px;margin-bottom:18px}.hero{background:linear-gradient(120deg,#14213d,#2166d1);color:#fff}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}label{display:block;font-weight:700;font-size:13px;margin:10px 0 5px}input,select,button{box-sizing:border-box;width:100%;padding:11px;border:1px solid #ccd5e1;border-radius:8px;font-size:14px}button{background:#2166d1;color:#fff;border:0;cursor:pointer;margin-top:10px}button.secondary{background:#fff;color:#2166d1;border:1px solid #2166d1}.muted{color:#667085;font-size:13px}.status{padding:10px;border-radius:8px;background:#eef4ff;margin-top:12px;white-space:pre-wrap}.hidden{display:none}table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:8px;border-bottom:1px solid #e5e7eb}code{word-break:break-all}</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero"><h1>Income Tax Customer Workspace</h1><p>Secure PAN, payslip and ITR-1 preparation workspace.</p><div id="google-button"></div><p id="login-note" class="muted" style="color:#dbeafe">Sign in with your Google account to continue.</p></section>
+  <section id="workspace" class="card hidden">
+    <h2>Customer workspace</h2><p id="user-line" class="muted"></p>
+    <div class="grid"><div><label>Assessment year</label><input id="ay" value="AY_2026-27"></div><div><label>Customer ID</label><input id="customer-id" placeholder="Assigned customer ID"></div></div>
+    <p class="muted">Your customer ID is assigned by the tax preparer. Only assigned workspaces can be accessed.</p>
+    <button onclick="loadSummary()">Load workspace summary</button><div id="summary" class="status"></div>
+    <h3>Upload evidence</h3><div class="grid"><div><label>Document type</label><select id="category"><option value="payslip">Payslip</option><option value="form16">Form 16</option><option value="identity">PAN / identity</option><option value="deduction_80g">80G donation evidence</option><option value="deduction_80c">80C evidence</option><option value="deduction_80d">80D evidence</option><option value="other">Other</option></select></div><div><label>PDF file</label><input id="file" type="file" accept="application/pdf"></div></div><button onclick="upload()">Upload document</button><div id="upload-status" class="status"></div>
+    <button class="secondary" onclick="listDocuments()">List uploaded documents</button><div id="documents" class="status"></div>
+  </section>
+</div>
+<script>
+const clientId='__GOOGLE_OAUTH_CLIENT_ID__'; let token=localStorage.getItem('income_tax_token')||'';
+function setStatus(id,text){document.getElementById(id).textContent=text}
+async function api(path,options={}){options.headers={...(options.headers||{}),Authorization:'Bearer '+token};const r=await fetch(path,options);const body=await r.text();let data;try{data=JSON.parse(body)}catch{data=body}if(!r.ok)throw new Error(typeof data==='string'?data:(data.detail||JSON.stringify(data)));return data}
+async function signedIn(){try{const me=await api('/api/me');document.getElementById('workspace').classList.remove('hidden');document.getElementById('user-line').textContent=`Signed in as ${me.email}. Assigned customer IDs: ${me.customer_ids.join(', ')||'none yet'}`;if(me.customer_ids.length&&!document.getElementById('customer-id').value)document.getElementById('customer-id').value=me.customer_ids[0];setStatus('login-note','Signed in successfully.')}catch(e){localStorage.removeItem('income_tax_token');token='';setStatus('login-note','Sign-in failed: '+e.message)}}
+function handleCredentialResponse(response){token=response.credential;localStorage.setItem('income_tax_token',token);signedIn()}
+window.onload=()=>{if(!clientId){setStatus('login-note','Google OAuth client is not configured.');return}google.accounts.id.initialize({client_id:clientId,callback:handleCredentialResponse});google.accounts.id.renderButton(document.getElementById('google-button'),{theme:'outline',size:'large',text:'sign_in'});if(token)signedIn()}
+function ids(){const ay=document.getElementById('ay').value.trim(),id=document.getElementById('customer-id').value.trim();if(!ay||!id)throw Error('Enter assessment year and assigned customer ID');return {ay,id}}
+async function loadSummary(){try{const x=ids();setStatus('summary',JSON.stringify(await api(`/api/assessment-years/${encodeURIComponent(x.ay)}/customers/${encodeURIComponent(x.id)}/summary`),null,2))}catch(e){setStatus('summary',e.message)}}
+async function upload(){try{const x=ids(),file=document.getElementById('file').files[0];if(!file)throw Error('Choose a PDF file');const form=new FormData();form.append('category',document.getElementById('category').value);form.append('file',file);const data=await api(`/api/assessment-years/${encodeURIComponent(x.ay)}/customers/${encodeURIComponent(x.id)}/documents`,{method:'POST',body:form});setStatus('upload-status','Uploaded: '+data.original_filename+' ('+data.category+')')}catch(e){setStatus('upload-status',e.message)}}
+async function listDocuments(){try{const x=ids(),data=await api(`/api/assessment-years/${encodeURIComponent(x.ay)}/customers/${encodeURIComponent(x.id)}/documents`);document.getElementById('documents').innerHTML='<table><tr><th>File</th><th>Type</th><th>Status</th><th>Uploaded</th></tr>'+data.documents.map(d=>`<tr><td>${d.original_filename}</td><td>${d.category}</td><td>${d.status}</td><td>${d.uploaded_at}</td></tr>`).join('')+'</table>'}catch(e){setStatus('documents',e.message)}}
+</script>
+</body></html>
